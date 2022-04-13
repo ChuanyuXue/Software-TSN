@@ -90,7 +90,26 @@ A Time-Sensitive Network End-Station purely achieved by software.
 
 ### 8.1 Evaluation methods
 
+### 8.2 Communication Jitter Result
+
+|              | User Space Jitter |                  |                  |                      | Kernel Space Jitter |                  |                  |                      | MAC Space Jitter |                  |                  |                      |
+| ------------ | ----------------- | ---------------- | ---------------- | -------------------- | ------------------- | ---------------- | ---------------- | -------------------- | ---------------- | ---------------- | ---------------- | -------------------- |
+|              | **Idle**          | **CPU stressed** | **I/O stressed** | **Network stressed** | **Idle**            | **CPU stressed** | **I/O stressed** | **Network stressed** | **Idle**         | **CPU stressed** | **I/O stressed** | **Network stressed** |
+| **Baseline** |                   |                  |                  |                      |                     |                  |                  |                      |                  |                  |                  |                      |
+|              |                   |                  |                  |                      |                     |                  |                  |                      |                  |                  |                  |                      |
+
+### 8.3 Cyclictest Result
+
+|              | CPU0     |          |          | CPU1     |          |          | CPU2     |          |          | CPU3     |          |          |
+| ------------ | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
+|              | **Min.** | **Avg.** | **Max.** | **Min.** | **Avg.** | **Max.** | **Min.** | **Avg.** | **Max.** | **Min.** | **Avg.** | **Max**. |
+| **Baseline** | 13       | 14       | 106      | 15       | 14       | 79       | 15       | 15       | 66       | 16       | 14       | 59       |
+|              |          |          |          |          |          |          |          |          |          |          |          |          |
 
 
 
 
+
+## 9. Appendix
+
+- `sudo timeout 100`  stop the command after a fixed period

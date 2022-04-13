@@ -44,8 +44,11 @@ int main(int argc, char *argv[])
     // start cyclic task
     struct period_info pinfo;
     periodic_task_init(&pinfo, 1e6);
+    int count = 0;
     while (1)
     {
+        printf("[ ---- Iter-%5d ----------------------------- ]\n", count++);
+        printf("SH-SEND    TIMESTAMP %ld.%09ld\n", ts[2].tv_sec, 0);
         send_single(fd_out, address, port);
         wait_rest_of_period(&pinfo);
     }

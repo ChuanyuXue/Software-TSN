@@ -16,7 +16,7 @@
 #include <linux/net_tstamp.h>
 
 #define BUFFER_LEN 256
-#define HW_FLAG 0
+#define HW_FLAG 1
 
 void die(const char *s);
 
