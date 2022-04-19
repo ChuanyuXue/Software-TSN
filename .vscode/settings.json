@@ -1,0 +1,5 @@
+{
+    "C_Cpp.default.includePath": [
+        "/usr/bin/aarch64-linux-gnu-gcc"
+    ]
+}

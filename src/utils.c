@@ -4,7 +4,7 @@ void die(const char *s)
 {
     // perror(s);
     // exit(1);
-    printf(s);
+    printf("%s", s);
 }
 
 int setup_receiver(int fd, const int port)
@@ -57,7 +57,6 @@ int setup_sender(int fd)
     {
         timestamp_flags = SOF_TIMESTAMPING_TX_SOFTWARE;
     }
-    
 
     if (setsockopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &timestamp_flags, sizeof(timestamp_flags)) < 0)
     {
@@ -68,6 +67,29 @@ int setup_sender(int fd)
     if (setsockopt(fd, SOL_SOCKET, SO_TIMESTAMPNS, &enable, sizeof(enable)))
     {
         die("setsockopt() SW receiving");
+    }
+}
+
+int setup_sender_sotime(int fd, const char *dev_name)
+{
+    int so_priority = DEFAULT_PRIORITY;
+    if (setsockopt(fd, SOL_SOCKET, SO_PRIORITY, &so_priority, sizeof(so_priority)))
+    {
+        die("setsockopt() Priority");
+    }
+
+    if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, dev_name, strlen(dev_name)))
+    {
+        die("setsockopt() Bind to dev");
+    }
+    // set up SO_TXTIME
+    static struct sock_txtime sk_txtime;
+
+    sk_txtime.clockid = CLOCK_TAI;
+    sk_txtime.flags = (DEADLINE_MODE | RECEIVE_ERROR);
+    if (USE_TXTIME && setsockopt(fd, SOL_SOCKET, SO_TXTIME, &sk_txtime, sizeof(sk_txtime)))
+    {
+        die("setsockopt() So_txtime");
     }
 }
 
@@ -139,6 +161,93 @@ void send_single(int fd, const char *address, const int port)
 
     // encode the returned packet
     struct cmsghdr *cmsg;
+
+    for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
+         cmsg = CMSG_NXTHDR(&msg, cmsg))
+    {
+        if (cmsg->cmsg_level == SOL_SOCKET &&
+            cmsg->cmsg_type == SCM_TIMESTAMPING)
+        {
+            struct timespec *ts =
+                (struct timespec *)CMSG_DATA(cmsg);
+            printf("HD-SEND    TIMESTAMP %ld.%09ld\n", ts[2].tv_sec, ts[2].tv_nsec);
+        }
+
+        if (cmsg->cmsg_level == SOL_SOCKET &&
+            cmsg->cmsg_type == SO_TIMESTAMPNS)
+        {
+            struct timespec *ts =
+                (struct timespec *)CMSG_DATA(cmsg);
+            printf("SW-SEND    TIMESTAMP %ld.%09ld\n", ts->tv_sec, ts->tv_nsec);
+        }
+    }
+}
+
+void sche_single(int fd, const char *address, const int port, uint64_t txtime)
+{
+    char control[BUFFER_LEN];
+    char data[BUFFER_LEN];
+
+    struct sockaddr_in si_server;
+    memset(&si_server, 0, sizeof(si_server));
+    si_server.sin_family = AF_INET;
+    si_server.sin_port = htons(port);
+    if (inet_aton(address, &si_server.sin_addr) == 0)
+    {
+        die("inet_aton()");
+    }
+
+    char buffer[BUFFER_LEN];
+
+    struct cmsghdr *cmsg;
+    struct iovec iov = (struct iovec){.iov_base = buffer, .iov_len = BUFFER_LEN};
+    struct msghdr msg = (struct msghdr){.msg_name = &si_server,
+                                        .msg_namelen = sizeof si_server,
+                                        .msg_iov = &iov,
+                                        .msg_iovlen = 1};
+
+    if (USE_TXTIME)
+    {
+        msg.msg_control = control;
+        msg.msg_controllen = sizeof(control);
+
+        cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_TXTIME;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(__u64));
+        *((uint64_t *)CMSG_DATA(cmsg)) = txtime; // __64u --> uint64_t CHUANYU MODIFIED
+    }
+
+    ssize_t send_len = sendmsg(fd, &msg, 0);
+    if (send_len < 0)
+    {
+        printf("[!] Error sendmsg()");
+    }
+
+    // -------- loopback
+
+    struct iovec entry;
+    struct sockaddr_in from_addr;
+    int res;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_iov = &entry;
+    msg.msg_iovlen = 1;
+    entry.iov_base = data;
+    entry.iov_len = sizeof(data);
+    msg.msg_name = (caddr_t)&from_addr;
+    msg.msg_namelen = sizeof(from_addr);
+    msg.msg_control = &control;
+    msg.msg_controllen = sizeof(control);
+
+    // wait until get the loopback
+
+    while (recvmsg(fd, &msg, MSG_ERRQUEUE) < 0)
+    {
+    }
+
+    // encode the returned packet
+    // struct cmsghdr *cmsg;
 
     for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
          cmsg = CMSG_NXTHDR(&msg, cmsg))

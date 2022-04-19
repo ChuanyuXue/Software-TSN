@@ -32,7 +32,7 @@ static void wait_rest_of_period(struct period_info *pinfo)
 int main(int argc, char *argv[])
 {
     // setup Conn
-    const char *address = "192.168.0.21";
+    const char *address = "192.168.0.13";
     const int port = 54321;
     const int fd_out = socket(AF_INET, SOCK_DGRAM, 0);
     if (HW_FLAG)
@@ -41,6 +41,9 @@ int main(int argc, char *argv[])
     }
 
     setup_sender(fd_out);
+
+    // Make
+
     // start cyclic task
     struct period_info pinfo;
     periodic_task_init(&pinfo, 1e6);
@@ -48,7 +51,6 @@ int main(int argc, char *argv[])
     while (1)
     {
         printf("[ ---- Iter-%5d ----------------------------- ]\n", count++);
-        printf("SH-SEND    TIMESTAMP %ld.%09ld\n", ts[2].tv_sec, 0);
         send_single(fd_out, address, port);
         wait_rest_of_period(&pinfo);
     }
