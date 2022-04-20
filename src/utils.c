@@ -77,7 +77,11 @@ int setup_sender_sotime(int fd, const char *dev_name)
     {
         die("setsockopt() Priority");
     }
-
+    int on = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
+    {
+        die("setsockopt() Reuse");
+    }
     if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, dev_name, strlen(dev_name)))
     {
         die("setsockopt() Bind to dev");
@@ -107,6 +111,18 @@ int setup_adapter(int fd, const char *dev_name)
     if (ioctl(fd, SIOCSHWTSTAMP, &ifr) == -1)
     {
         die("ioctl()");
+    }
+
+    // unknown operation from udp_tai.c
+    struct ifreq ifreq;
+    int err;
+
+    memset(&ifreq, 0, sizeof(ifreq));
+    strncpy(ifreq.ifr_name, dev_name, sizeof(ifreq.ifr_name) - 1);
+    err = ioctl(fd, SIOCGIFINDEX, &ifreq);
+    if (err < 0)
+    {
+        die("ioctl SIOCGIFINDEX failed");
     }
 }
 
@@ -183,9 +199,9 @@ void send_single(int fd, const char *address, const int port)
     }
 }
 
-void sche_single(int fd, const char *address, const int port, uint64_t txtime)
+void sche_single(int fd, const char *address, const int port, __u64 txtime)
 {
-    char control[BUFFER_LEN];
+    char control[CMSG_SPACE(sizeof(txtime))];
     char data[BUFFER_LEN];
 
     struct sockaddr_in si_server;
@@ -202,24 +218,21 @@ void sche_single(int fd, const char *address, const int port, uint64_t txtime)
     struct cmsghdr *cmsg;
     struct iovec iov = (struct iovec){.iov_base = buffer, .iov_len = BUFFER_LEN};
     struct msghdr msg = (struct msghdr){.msg_name = &si_server,
-                                        .msg_namelen = sizeof si_server,
+                                        .msg_namelen = sizeof(si_server),
                                         .msg_iov = &iov,
                                         .msg_iovlen = 1};
 
-    if (USE_TXTIME)
-    {
-        msg.msg_control = control;
-        msg.msg_controllen = sizeof(control);
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof(control);
 
-        cmsg = CMSG_FIRSTHDR(&msg);
-        cmsg->cmsg_level = SOL_SOCKET;
-        cmsg->cmsg_type = SCM_TXTIME;
-        cmsg->cmsg_len = CMSG_LEN(sizeof(__u64));
-        *((uint64_t *)CMSG_DATA(cmsg)) = txtime; // __64u --> uint64_t CHUANYU MODIFIED
-    }
+    cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_TXTIME;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(__u64));
+    *((__u64 *)CMSG_DATA(cmsg)) = txtime; // __64u --> uint64_t CHUANYU MODIFIED
 
     ssize_t send_len = sendmsg(fd, &msg, 0);
-    if (send_len < 0)
+    if (send_len < 1)
     {
         printf("[!] Error sendmsg()");
     }
@@ -228,6 +241,7 @@ void sche_single(int fd, const char *address, const int port, uint64_t txtime)
 
     struct iovec entry;
     struct sockaddr_in from_addr;
+    char control_back[BUFFER_LEN];
     int res;
 
     memset(&msg, 0, sizeof(msg));
@@ -237,8 +251,8 @@ void sche_single(int fd, const char *address, const int port, uint64_t txtime)
     entry.iov_len = sizeof(data);
     msg.msg_name = (caddr_t)&from_addr;
     msg.msg_namelen = sizeof(from_addr);
-    msg.msg_control = &control;
-    msg.msg_controllen = sizeof(control);
+    msg.msg_control = &control_back;
+    msg.msg_controllen = sizeof(control_back);
 
     // wait until get the loopback
 

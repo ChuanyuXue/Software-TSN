@@ -1,5 +1,10 @@
 {
     "C_Cpp.default.includePath": [
         "/usr/bin/aarch64-linux-gnu-gcc"
-    ]
+    ],
+    "C_Cpp.errorSquiggles": "Enabled",
+    "files.associations": {
+        "typeinfo": "c",
+        "net_tstamp.h": "c"
+    }
 }

@@ -1,3 +1,4 @@
+#define _GNU_SOURCE /*for CPU_SET*/
 #include <time.h>
 #include <poll.h>
 #include <errno.h>
@@ -14,6 +15,8 @@
 #include <netinet/in.h>
 #include <linux/sockios.h>
 #include <linux/net_tstamp.h>
+#include <sched.h>
+#include <pthread.h>
 
 #ifndef SO_TXTIME
 #define SO_TXTIME 61
@@ -26,14 +29,30 @@
 #define SO_EE_CODE_TXTIME_MISSED 2
 #endif
 
+#ifndef CLOCK_TAI
+#define CLOCK_TAI 11
+#endif
+
+#ifndef TIMER_ABSTIME
+#define TIMER_ABSTIME 1
+#endif
+
 #define BUFFER_LEN 256
-#define HW_FLAG 1
+#define HW_FLAG 0
 
 #define USE_TXTIME 1
 #define DEFAULT_PRIORITY 3
-#define TIME_DELTA 100
-#define DEADLINE_MODE SOF_TXTIME_DEADLINE_MODE
-#define RECEIVE_ERROR SOF_TXTIME_REPORT_ERRORS
+#define TIME_DELTA 2 * ONESEC
+#define PERIOD 10000000
+#define ONESEC 1000000000ULL
+
+#define QDISC_DELTA 150000
+
+// #define DEADLINE_MODE SOF_TXTIME_DEADLINE_MODE
+// #define RECEIVE_ERROR SOF_TXTIME_REPORT_ERRORS
+
+#define DEADLINE_MODE 0
+#define RECEIVE_ERROR 0
 
 /* When deadline_mode is set, the qdisc will handle txtime
 with a different semantics, changed from a 'strict'
@@ -53,4 +72,4 @@ void recv_single(int fd);
 // CHUANYU APR 19 MODIFICATION
 
 int setup_sender_sotime(int fd, const char *dev_name);
-void sche_single(int fd, const char *address, const int port, uint64_t txtime);
+void sche_single(int fd, const char *address, const int port, __u64 txtime);

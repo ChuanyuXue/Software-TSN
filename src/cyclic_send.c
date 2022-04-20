@@ -20,13 +20,13 @@ static void inc_period(struct period_info *pinfo)
 static void periodic_task_init(struct period_info *pinfo, const long period)
 {
     pinfo->period_ns = period;
-    clock_gettime(CLOCK_MONOTONIC, &(pinfo->next_period));
+    clock_gettime(CLOCK_TAI, &(pinfo->next_period));
 }
 
 static void wait_rest_of_period(struct period_info *pinfo)
 {
     inc_period(pinfo);
-    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &pinfo->next_period, NULL);
+    clock_nanosleep(CLOCK_TAI, TIMER_ABSTIME, &pinfo->next_period, NULL);
 }
 
 int main(int argc, char *argv[])
@@ -35,6 +35,8 @@ int main(int argc, char *argv[])
     const char *address = "192.168.0.13";
     const int port = 54321;
     const int fd_out = socket(AF_INET, SOCK_DGRAM, 0);
+    uint64_t next_time;
+    uint64_t rand_sec;
     if (HW_FLAG)
     {
         setup_adapter(fd_out, "eth0");
@@ -46,11 +48,13 @@ int main(int argc, char *argv[])
 
     // start cyclic task
     struct period_info pinfo;
-    periodic_task_init(&pinfo, 1e6);
+    periodic_task_init(&pinfo, PERIOD);
     int count = 0;
     while (1)
     {
         printf("[ ---- Iter-%5d ----------------------------- ]\n", count++);
+        next_time = pinfo.next_period.tv_sec * ONESEC + pinfo.next_period.tv_nsec;
+        printf("SW-SCHE    TIMESTAMP %ld.%09ld\n", next_time / ONESEC, next_time % ONESEC);
         send_single(fd_out, address, port);
         wait_rest_of_period(&pinfo);
     }
